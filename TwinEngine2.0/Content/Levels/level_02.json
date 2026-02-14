@@ -1,0 +1,111 @@
+{
+  "name": "Level 2 - Entity Showcase",
+  "description": "Demonstrates different entity types with varied behaviors",
+  "entities": [
+    {
+      "type": "Player",
+      "x": 100,
+      "y": 300
+    },
+    {
+      "type": "Platform",
+      "x": 50,
+      "y": 400
+    },
+    {
+      "type": "Platform",
+      "x": 150,
+      "y": 400
+    },
+    {
+      "type": "Platform",
+      "x": 250,
+      "y": 400
+    },
+    {
+      "type": "Platform",
+      "x": 350,
+      "y": 350
+    },
+    {
+      "type": "Platform",
+      "x": 450,
+      "y": 300
+    },
+    {
+      "type": "Wall",
+      "x": 300,
+      "y": 250
+    },
+    {
+      "type": "Wall",
+      "x": 500,
+      "y": 200
+    },
+    {
+      "type": "Static_NPC",
+      "x": 200,
+      "y": 370
+    },
+    {
+      "type": "Static_NPC",
+      "x": 400,
+      "y": 320
+    },
+    {
+      "type": "Floating_Enemy",
+      "x": 250,
+      "y": 200
+    },
+    {
+      "type": "Floating_Enemy",
+      "x": 350,
+      "y": 150
+    },
+    {
+      "type": "Floating_Enemy",
+      "x": 450,
+      "y": 180
+    },
+    {
+      "type": "Ground_Enemy",
+      "x": 180,
+      "y": 370
+    },
+    {
+      "type": "Ground_Enemy",
+      "x": 380,
+      "y": 320
+    },
+    {
+      "type": "Collectible",
+      "x": 150,
+      "y": 350
+    },
+    {
+      "type": "Collectible",
+      "x": 250,
+      "y": 300
+    },
+    {
+      "type": "Collectible",
+      "x": 350,
+      "y": 280
+    },
+    {
+      "type": "Collectible",
+      "x": 450,
+      "y": 250
+    },
+    {
+      "type": "Decoration",
+      "x": 100,
+      "y": 100
+    },
+    {
+      "type": "Decoration",
+      "x": 550,
+      "y": 150
+    }
+  ]
+}
