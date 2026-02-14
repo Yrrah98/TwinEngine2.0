@@ -1,6 +1,7 @@
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Input;
 using TwinEngine2._0.Engine.Core;
+using TwinEngine2._0.Engine.Spatial;
 using TwinEngine2._0.Engine.Systems;
 using TwinEngine2._0.Game.Components;
 
@@ -9,12 +10,14 @@ namespace TwinEngine2._0.Game.Systems
     /// <summary>
     /// System that handles physics simulation including gravity, jumping, and screen boundaries.
     /// Runs after MovementSystem (ExecutionOrder: 150) but before rendering.
+    /// Uses QuadTree spatial partitioning for efficient collision detection.
     /// </summary>
     public class PhysicsSystem : ISystem
     {
         private World _world;
         private readonly int _screenWidth;
         private readonly int _screenHeight;
+        private readonly Rectangle _worldBounds;
 
         // Global gravity toggle
         private static bool _gravityEnabled = true;
@@ -26,6 +29,7 @@ namespace TwinEngine2._0.Game.Systems
         {
             _screenWidth = screenWidth;
             _screenHeight = screenHeight;
+            _worldBounds = new Rectangle(0, 0, screenWidth, screenHeight);
             _previousKeyboardState = Keyboard.GetState();
         }
 
@@ -45,6 +49,30 @@ namespace TwinEngine2._0.Game.Systems
                 _gravityEnabled = !_gravityEnabled;
             }
             _previousKeyboardState = currentKeyboardState;
+
+            // Build QuadTree for spatial collision queries
+            var quadTree = new QuadTree(_worldBounds, maxEntities: 4, maxDepth: 5);
+
+            // Populate QuadTree with all colliders
+            var colliderEntities = _world.GetEntitiesWith<ColliderComponent>();
+            for (int i = 0; i < colliderEntities.Length; i++)
+            {
+                var colliderEntity = new Entity(colliderEntities[i]);
+                if (_world.HasComponent<PositionComponent>(colliderEntity) &&
+                    _world.HasComponent<SizeComponent>(colliderEntity))
+                {
+                    ref var pos = ref _world.GetComponent<PositionComponent>(colliderEntity);
+                    ref var size = ref _world.GetComponent<SizeComponent>(colliderEntity);
+
+                    Rectangle bounds = new Rectangle(
+                        (int)pos.Position.X,
+                        (int)pos.Position.Y,
+                        (int)size.Size.X,
+                        (int)size.Size.Y
+                    );
+                    quadTree.Insert(colliderEntity, bounds);
+                }
+            }
 
             // Process all entities with GravityComponent
             var gravityComponents = _world.GetComponents<GravityComponent>();
@@ -83,12 +111,81 @@ namespace TwinEngine2._0.Game.Systems
                     }
 
                     // Apply vertical velocity to position
-                    position.Position.Y += gravity.VerticalVelocity * deltaTime;
+                    float newY = position.Position.Y + gravity.VerticalVelocity * deltaTime;
+
+                    // Check for collisions with other entities using QuadTree
+                    var collisionInfo = GetCollision(entity, position.Position.X, newY, size.Size, quadTree);
+
+                    if (collisionInfo.HasCollision)
+                    {
+                        // Resolve collision by positioning entity at contact point
+                        if (gravity.VerticalVelocity > 0) // Moving down
+                        {
+                            // Position entity so its bottom touches the top of the obstacle
+                            position.Position.Y = collisionInfo.CollidedBounds.Top - size.Size.Y;
+                            gravity.IsGrounded = true;
+                        }
+                        else if (gravity.VerticalVelocity < 0) // Moving up
+                        {
+                            // Position entity so its top touches the bottom of the obstacle
+                            position.Position.Y = collisionInfo.CollidedBounds.Bottom;
+                        }
+
+                        // Stop vertical movement
+                        gravity.VerticalVelocity = 0;
+                    }
+                    else
+                    {
+                        // No collision, apply the movement
+                        position.Position.Y = newY;
+                        gravity.IsGrounded = false;
+                    }
                 }
 
                 // Enforce screen boundaries
                 EnforceBoundaries(ref position, ref size, ref gravity);
             }
+        }
+
+        /// <summary>
+        /// Structure to hold collision detection results.
+        /// </summary>
+        private struct CollisionResult
+        {
+            public bool HasCollision;
+            public Rectangle CollidedBounds;
+        }
+
+        /// <summary>
+        /// Checks for collision and returns collision info for proper resolution.
+        /// Uses QuadTree spatial partitioning to reduce collision checks.
+        /// </summary>
+        private CollisionResult GetCollision(Entity entity, float x, float y, Vector2 size, QuadTree quadTree)
+        {
+            Rectangle proposedBounds = new Rectangle((int)x, (int)y, (int)size.X, (int)size.Y);
+
+            // Query QuadTree for nearby entities (broad phase)
+            var candidates = quadTree.Query(proposedBounds);
+
+            // Check collision with nearby candidates only (narrow phase)
+            foreach (var candidate in candidates)
+            {
+                // Skip self
+                if (candidate.Entity == entity)
+                    continue;
+
+                // Check AABB intersection
+                if (proposedBounds.Intersects(candidate.Bounds))
+                {
+                    return new CollisionResult
+                    {
+                        HasCollision = true,
+                        CollidedBounds = candidate.Bounds
+                    };
+                }
+            }
+
+            return new CollisionResult { HasCollision = false };
         }
 
         /// <summary>
@@ -102,10 +199,6 @@ namespace TwinEngine2._0.Game.Systems
                 position.Position.Y = _screenHeight - size.Size.Y;
                 gravity.VerticalVelocity = 0;
                 gravity.IsGrounded = true;
-            }
-            else
-            {
-                gravity.IsGrounded = false;
             }
 
             // Top boundary
